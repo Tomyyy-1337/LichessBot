@@ -1,13 +1,58 @@
-use chess::ChessMove;
+use std::str::FromStr;
+
+use chess::{Board, ChessMove};
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, AUTHORIZATION};
+use reqwest::header::{self, HeaderMap, AUTHORIZATION};
 
 fn main() {
     let api_token = std::env::var("LICHESS_API_KEY").unwrap();
 
     let client = Client::new();
-    let api_token = format!("Bearer {}", api_token);
+    
+    load_puzzle(&client, &api_token);
 
+    let board = Board::default();
+
+    load_tablebase(&client, &api_token, &board);
+
+
+    
+
+    
+}
+
+fn load_tablebase(client: &Client, api_token: &str, board: &Board) {
+    // let board = Board::from_str("4k3/6KP/8/8/8/8/7p/8 w - - 0 1").unwrap();
+    let fen = board.to_string().replace(" ", "_"); 
+
+    println!("{}", fen);
+
+
+    let url = format!("http://tablebase.lichess.ovh/standard?fen={}", fen);
+    let mut headers = HeaderMap::new();
+    headers.insert(AUTHORIZATION, api_token.parse().unwrap());
+
+    let response = client
+        .get(&url)
+        .headers(headers)
+        .send()
+        .unwrap();
+
+    match response.status() {
+        reqwest::StatusCode::OK => {
+            let body = response.text().unwrap();
+            println!("{}", body);
+        }
+        reqwest::StatusCode::BAD_REQUEST => {
+            println!("Not in tablebase");
+        }
+        _ => {
+            println!("Error: {}", response.status());
+        }
+    }
+}   
+
+fn load_puzzle(client: &Client, api_token: &str) {
     let mut headers = HeaderMap::new();
     headers.insert(AUTHORIZATION, api_token.parse().unwrap());
 
