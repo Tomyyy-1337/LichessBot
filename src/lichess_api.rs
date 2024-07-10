@@ -1,7 +1,7 @@
 use std::{io::Read, str::FromStr};
 
 use arrow::ipc::reader::StreamReader;
-use rayon::result;
+use rayon::{option, result};
 use reqwest::{Client, Method, Request, RequestBuilder};
 use chess::{ChessMove, Game};
 use serde_json::{Deserializer, Value};
@@ -80,6 +80,36 @@ impl LichessAPI {
                 None
             }
         }
+    }
+
+    pub async fn start_game(&self) -> Option<String> {
+        let url = "https://lichess.org/api/challenge/ai";
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(reqwest::header::AUTHORIZATION, format!("Bearer {}", self.api_token).parse().unwrap());
+
+        let params = [
+            ("level", "2"), // Level von Stockfish (1-8)
+            ("color", "white"), // Ihre Farbe ("white" oder "black")
+            ("variant", "standard"), // Variante ("standard", "chess960", "crazyhouse", "antichess", "atomic", "horde", "kingOfTheHill", "racingKings", "threeCheck")/ Wer spielt gegen den Bot? ("bot" oder "user
+        ];
+
+        let response = self.client
+            .post(url)
+            .headers(headers)
+            .form(&params)
+            .send()
+            .await
+            .unwrap();
+
+        if response.status().is_success() {
+            let game_info: serde_json::Value = response.json().await.unwrap();
+
+            return Some(game_info["game"]["id"].as_str().unwrap().to_string())
+        }
+        println!("Failed to start game: {:?}", response.text().await.unwrap());
+        None
+        
+        
     }
 
     pub async fn get_game(&self, game_id: &str) -> Game {
